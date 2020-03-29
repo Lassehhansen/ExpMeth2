@@ -1,0 +1,138 @@
+---
+title: "Portfolio 4, Study Group 10"
+author: "Jesper Fischer, Kristian Severin, Lasse Hansen, Lærke Brædder, Sarah Hvid"
+date: "03/04/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Importing packages
+
+```{r}
+library(tidyverse)
+```
+
+#### 1.a. How much does it have to be moved (indicate 3 translations and 3 rotations)?
+
+
+new mm = 47.5 55.1 31.3 and rot = 0.1, 0, -0.07
+
+
+#### 1.b. Align the AC of the structural image to [0,0,0] with PC at [0,y,0]. How much does that have to be moved?
+
+we moved it to mm = 132.1 147.2 89.3, and no rotation.  
+
+
+#### 1.c. How far are the two images from being in register with one another?
+
+mm and vx subtracted from each other. 
+47.5 - 132.1 = -84.6
+55,1 - 147.2 = -92,1
+31.3 - 89.3 = -58
+
+0.1 - 0 = 0.1
+0 - 0 = 0
+-0.07 - 0 = -0.07
+
+
+#### 2.a-2.f Pictures of Realignment, Coregestration, Segmentation, Normalization, Smoothing:
+
+![Realignment](spm_2020Feb26.jpg)
+
+![Realignment2](spm_2020Feb26-copy-2.jpg)
+
+![Functional Coregristration](FuncCoreg.png)
+
+![Structural Coregristation](FuncCoreg.png)
+
+![Segmentation](segmentation.png)
+
+![Bias-Correct Segmentation](Biascorrect.png)
+
+![Normalization](Normalization.png)
+
+
+![Smoothing](Smoothing.png)
+
+
+#### Import the realignment parameters into R.
+
+```{r}
+Real <- read_table("rp_fSubjectNo0001-0005-00001-000001-01.txt", col_names = F)
+```
+
+#### 3.a. Make a lineplot of the realignment parameters in R.
+
+```{r}
+ts.plot(Real, col = 1:6)
+```
+
+
+#### 3.b. How far has the participant moved for each dimension during the experiment (Hint: use “apply()” to run a function across columns)?
+
+Using the function apply to apply the function range across all columns. This gives us the minimum and maximum values of the realignment parameters. Afterwards the difference between these values are calculated, which gives the total of how far the participant has moved across all axis.
+
+```{r}
+ran <- apply(Real, 2, range)
+apply(ran, 2, diff)
+```
+
+The output shows that the participants moved most across the z-axis, and least across the x-axis. The rotational values are all very low, less than 0.5 degrees (converted from radians). 
+
+#### 3.c. Are any of the realignment parameters significantly correlated with the fMRI model (same model as used in exercise 3)?
+
+```{r}
+fmrides <- as.matrix(read.csv("fmri.design.csv", header=FALSE))
+real <- as.matrix(Real)
+mod <- lm(real ~ fmrides)
+summary.lm(mod)
+```
+
+The first model between V1 and the realignment parameters shows significant correlation between data4 and data5 which is the rotation parameters.
+the second model between v2 and the realignment parameters shows significant correlation between data2, data3, data4, and data6. so in this case it is significant for both the y- and z-axis and rotational parameters. 
+
+Remove linear effects of time from the realignment parameters (hint: 1:400, fit a line and use residuals).
+
+#### 3.d. Make a lineplot of the realignment parameters with time removed.
+
+Creating a vector containing the numbers 1-400 representing the passage of time. this is then used as a predictor for our data, in order to remove any variation explained by this fact. Thereafter the residuals are extracted from the model and two plots are created.
+
+```{r}
+constant <- 1:400
+modd <- lm(real ~ constant)
+res <- modd$residuals
+res <- as.data.frame(modd$residuals)
+ts.plot(res, col = 1:6)
+```
+
+This correction has improved the variance in our data caused by the drift, as can be seen if the first plot is compared to this one. 
+
+#### 3.e. Make a lineplot including only the first realignment parameter before and after removal.
+
+We are removing the first parameters from the timecorrected residuals and from the residuals that are not time corrected. Then we are binding them into a dataframe and creating two plottypes to illustrate the correction of the data. 
+
+```{r}
+res1 <- as.data.frame(mod$residuals)
+combined <- as.matrix(cbind(res$X1, res1$X1))
+
+ts.plot(combined, col = 1:2)
+legend('bottomleft', legend = 1:2, col = 1:2, lty = 1)
+```
+
+In our plot, 1 = time corrected and 2 = not time corrected. It can be discerned that the time corrected line has less variance overall. 
+
+#### 3.f. Are the realignment parameters (corrected for effects of time) now correlated with the fMRI model?
+
+Creating a model that uses the time corrected residuals to predict the fmrides model. 
+
+```{r}
+realparam <- as.matrix(res)
+summary(lm(fmrides ~ realparam))
+```
+
+According to the new model in V1 only the res5 (rotation) show significant results. In v2 res1 (distance), res2 (distance), res4 (rotations), res5 (rotations), res6 (rotations) are significant.

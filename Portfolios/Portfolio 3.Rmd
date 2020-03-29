@@ -1,0 +1,283 @@
+---
+title: "Portfolio 3, Study Group 10"
+author: "Jesper Fischer, Lasse Hansen & Sarah Hviid"
+date: "2/19/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r}
+pacman::p_load(astsa, ggplot2, reshape, pracma, tidyverse)
+```
+
+### Loading data 
+
+```{r}
+##data
+fmri <- as.matrix(read.csv("portfolio_assignment3_aud_fmri_data37 (1).csv", header=FALSE))
+##making it a time-series
+
+fmri2 <- ts(fmri)
+##design
+
+fmrides <- as.matrix(read.csv("portfolio_assignment3_aud_fmri_design (1).csv", header=FALSE))
+w##making it a time-series
+
+fmrides2 <- ts(fmrides)
+```
+
+#### 1.a. A figure with lineplots of the data from all participants as a function of time in one figure
+
+```{r}
+#Using the function ts.plot to plot the time-series data:
+matplot(fmri2)
+```
+
+### 1.b. A boxplot with the signal intensity for each participant. Note how much the baseline signal can vary between participants.
+
+
+```{r}
+#To be able to displauy the data as a boxplot for the signal intensity for each participant. We will change the data from wide data into long data. This is done with the melt() function:
+melt(fmri2)
+
+ggplot(melt, aes(X2, value, fill = X2)) + geom_boxplot()
+```
+
+### 1.c. A lineplots figure with the model covariates.
+
+#### We have made to different lineplots with two different functions. GGplot is used to plot the two covariates next to eachother. The other plot is made using plot.ts, where the two covariates are plotted under eachother: 
+
+```{r}
+df2 <- as.data.frame(fmrides2)
+ggplot(df2, aes(1:400)) + 
+  geom_line(aes(y = V1, colour = "var0")) + 
+  geom_line(aes(y = V2, colour = "var1")) + xlab = "time"
+
+plot.ts(fmrides2)
+```
+
+### 2. Based on the shape of the model: How many stories did the participants listen to in each condition (you can also automatise this, e.g. using “findpeaks” in library(pracma))?
+
+#### We assume that each peak in the model symbolises a story being told to the participants. As the design matrix is made on the assumption that a story makes brain activity spike.
+
+```{r}
+#We use nrow() and findpeaks() as the findpeaks function gives us rows of the different peaks
+nrow(findpeaks(df2$V1))
+nrow(findpeaks(df2$V2))
+```
+
+### 3.a. Are the two model covariates correlated?
+
+#### If the two covariates are correlated we will see a linear tendency between them. Therefore we start by plotting the two in a line plot. Afterwards we add a linear regression line to the data:
+
+```{r}
+ggplot(df2, aes(df2$V1, df2$V2)) + geom_line() + geom_smooth(method = "lm")
+```
+
+#### It seems there is a negative linear tendency between the two covariates
+#### To find if there is a correlation between the covariates we use a correlation test to find the correlation coefficient
+
+```{r}
+cor.test(df2$V1, df2$V2)
+```
+
+#### As expected there is a negative correlation between the two which is quite high -0.54. Therefore the two model covariates are correlated to some extend
+
+
+### 3.b. Have the covariates been mean-centered?
+
+#### If the data that has been mean centered is modelled, the intercept of that model should be equal to the mean. Therefore we start by making a model. Afterwards we see if the mean is significantly different from the intercept:
+
+```{r}
+v1 <- lm(df2$V1 ~ df2$V2)
+v2 <- lm(df2$V2 ~ df2$V1)
+v1coef <- v1$coefficients
+v2coef <- v2$coefficients
+
+t.test(mu = v1coef[1:1], df2$V1)
+t.test(mu = v2coef[1:1], df2$V2)
+```
+
+#### Yes it seems that the covariates have been mean centered. As the t.test showed that there was no signifcant difference between the intercepts of the two models and the mean of the models.
+
+### 4. Please report the percentage of shared variance in the two covariates.
+
+#### The shared perceptage of varaince = R^2 by taking our r value to the power of 2:
+
+```{r}
+corrtest <- cor.test(df2$V1, df2$V2)
+corrtest$estimate^2
+```
+
+#### Afterwards we can test is the r^2 value is the same when we put the two variables in a linear model:
+
+```{r}
+summary(lm(df2$V1 ~ df2$V2))
+```
+
+#### The shared variance of the two covariates = 0.2946.
+
+
+### 5. Pick one participant’s data set.
+
+```{r}
+p1 <- fmri2[,1]
+```
+
+### Conduct 6 analyses using lm():
+
+### 5.a. Fit the model as it is, including intercept.
+
+```{r}
+model <- lm(p1 ~ fmrides2)
+summary(model)
+```
+
+### 5.b. Fit the model as it is, excluding intercept.
+
+#### Fitting a model is done by adding 0 as an independent variable, thereby the intercept is set to 0
+
+```{r}
+model2 <- lm(p1 ~ fmrides2 + 0)
+summary(model2)
+```
+
+### 5.c. Fit only the 1st covariate as a model
+
+#### The first model is called by using hard brackets
+
+```{r}
+model2 <- lm(p1 ~ fmrides2[,1])
+summary(model2)
+```
+
+
+### 5.d. Fit only the 2nd covariate as a model. 
+
+```{r}
+model3 <- lm(p1 ~ fmrides2[,2])
+summary(model3)
+```
+
+### 5.e. Fit the 2nd covariate to the residuals from analysis 5.c., the 1st covariate only analysis
+
+#### The residuals from analysis 5.c is saved in a vector and thereafter used in the lm model as the dependent variable
+
+```{r}
+res <- model3$residuals
+model4 <- lm(res ~ fmrides2[,2])
+summary(model4)
+```
+
+
+### 5.f. Fit the 1st covariate to the resistuals from 5.d., the 2nd covariate only analysis
+
+#### The residuals from analysis 5.d is saved in a vector and thereafter used in the lm model as the dependent variable
+
+```{r}
+res2 <- model3$residuals
+model5 <- lm(res2 ~ fmrides[,1])
+summary(model5)
+```
+
+###5.g. Does the order in which the predictor variables are fitted to the data matter for the estimates? If it does, what can explain this?
+
+#### The estimates of the different models are a little different. This is because the two covariates are correlated as we found in assignment 3a.
+
+### 6. Fit the full model to each of the 37 participants’ data and extract the coefficients for each participant.
+
+#### The full model is made, afterwards we extract the coefficients from the model for display
+
+```{r}
+fullmodel <- lm(fmri2 ~ fmrides2)
+summary(fullmodel)
+coefficients <- fullmodel$coefficients
+coefficients
+```
+
+
+### 6.a. Test the two individual hypotheses that the set of coefficient from each covariate is different from zero across the whole group (similar to assignment 1).
+
+#### To do this we are testing whether the coefficients from the full model are different from zero using a t-test. This is done with a one-sided as we assume that the coefficients are larger than zero, because or else our design matrices would not be very effective. 
+
+```{r}
+t.test(coefficients[2,], mu = 0, alternative = "two.sided")
+t.test(coefficients[3,], mu = 0, alternative = "two.sided")
+```
+
+#### From the t-test it is made clear that the coefficients are different from zero.
+
+### Make a contrast that investigates the difference between the two covariates, i.e. the two types of stories.
+### 6.b. Test the hypothesis that the contrast is different from zero across participants.
+
+#### The contrast it made by substracting the one covariate from the other. Afterwards we use a one sided t-test to test if the contrast is significantly different from 0:
+
+```{r}
+contr <- fmrides2[,1]-fmrides2[,2]
+t.test(contr, mu = 0, alternative = "two.sided")
+```
+
+#### With a p-value from 1 we can see that the contrast is not significantly different from 0. 
+
+### 6.c. Make a bar diagram including the mean effect of the two coefficents and the contrast, including error bars (indicating standard error of mean)
+
+#### The different coefficients from the model are called using hard brackets, afterwards the contrast is also draws by substracting the coefficients from the one covariate from the other. Afterwards we use ggplot to visualise this and adding an errorbar
+
+```{r}
+cof1 <- coefficients[2,]
+cof2 <- coefficients[3,]
+cof3 <- coefficients[2,] - coefficients[3,]
+con1 <- data.frame(cof1,cof2,cof3)
+con <- gather(con1)
+
+ggplot(con, aes(key, value, fill = key)) + geom_bar( stat = 'summary', fun.y = mean, width = 0.5) +
+geom_errorbar(stat = 'summary', fun.data = mean_se, width = 0.5)
+
+```
+
+### 7.a. For each partipant, add a covariate that models the effect of time (hint: 1:400)
+
+#### A covariate called time is added
+
+```{r}
+time <- 1:400
+```
+
+### 7.a. Does that improve the group results in term of higher t-values?
+
+#### First a model is made with the new covariate as an independent predictor. Afterwards we transpose the  vectors containing coefficients from the original model and the model where time is added. This is done so that we can compare the covariates modelled with and without time with a t-test:
+
+```{r}
+#The new model with the time vector added as an independent variable
+modd <- lm(fmri2 ~ fmrides2 + time)
+summary(modd)
+#The coefficients are saved in a matrix 
+newcoef <- modd$coefficients
+#First transposing the coefficients from the new model
+newcoef <- t(newcoef)
+#Transposing the coefficients from the old model
+coefs <- t(coefficients)
+#Two t-test are made 
+t.test(newcoef[,2], coefs[,2], alternative = "two.sided")
+t.test(newcoef[,3], coefs[,3], alternative = "two.sided")
+```
+
+#### From the t-test it is shown that there is no significant difference between the two coefficients
+
+### 8. Make a bar diagram like in 6.c, but display effects as percent signal change (hint: percent signal change is slope divided by intercept
+
+#### First three new vectors are made with the three different percent signal changes. Afterwards a dataframe is made with the 3 vectors this dataframe is turned from a wide format to a long format. Then we plot this data in a bar plot using ggplot and adding errorbars
+
+```{r}
+psignal <- coefficients[2,]/coefficients[1,]
+psignal2 <- coefficients[3,]/coefficients[1,]
+psignal3 <- (coefficients[2,] - coefficients[3,])/coefficients[1,]
+pchange <- data.frame(psignal,psignal2,psignal3)
+
+pchange <- gather(pchange)
+
+ggplot(pchange, aes(key, value, fill = key)) + geom_bar( stat = 'summary', fun.y = mean, width = 0.5) +
+geom_errorbar(stat = 'summary', fun.data = mean_se, width = 0.5)
+```
+
